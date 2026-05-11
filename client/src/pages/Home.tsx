@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Check, Star } from "lucide-react";
 import { useEffect, useState } from "react";
+import NewsletterForm from "@/components/NewsletterForm";
 
 /**
  * Landing Page: Solilóquios para a Alma
@@ -292,6 +293,22 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Newsletter Section */}
+      <section className="bg-secondary/50 py-16 border-t border-border">
+        <div className="container max-w-2xl">
+          <h2
+            className="text-4xl font-bold mb-4 text-center text-accent"
+            style={{ fontFamily: "Playfair Display" }}
+          >
+            Receba Insights Exclusivos
+          </h2>
+          <p className="text-center text-gray-300 mb-8">
+            Inscreva-se na nossa newsletter e receba dicas, reflexões e ofertas exclusivas sobre o mundo do solilóquio e autoconhecimento.
+          </p>
+          <NewsletterForm />
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="bg-card border-t border-border py-12">
         <div className="container">
@@ -313,8 +330,13 @@ export default function Home() {
             <div>
               <h3 className="font-bold text-accent mb-4">Contato</h3>
               <p className="text-sm text-gray-400">
-                <a href="mailto:contato@soliloquios.com" className="hover:text-accent transition">
-                  contato@soliloquios.com
+                <a href="mailto:jornalista0013093@gmail.com" className="hover:text-accent transition">
+                  jornalista0013093@gmail.com
+                </a>
+              </p>
+              <p className="text-sm text-gray-400 mt-2">
+                <a href="tel:+554192062238" className="hover:text-accent transition">
+                  (41) 92062-238
                 </a>
               </p>
             </div>
