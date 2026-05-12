@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Check, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import NewsletterForm from "@/components/NewsletterForm";
+import { useAnalytics, ANALYTICS_EVENTS } from "@/hooks/useAnalytics";
 
 /**
  * Landing Page: Solilóquios para a Alma
@@ -12,6 +13,7 @@ import NewsletterForm from "@/components/NewsletterForm";
 
 export default function Home() {
   const [isScrolled, setIsScrolled] = useState(false);
+  const { trackEvent } = useAnalytics();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -20,6 +22,13 @@ export default function Home() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const handleCTAClick = (ctaName: string) => {
+    trackEvent(ctaName, {
+      button_text: "Garantir Minha Coleção",
+      location: "hero_section",
+    });
+  };
 
   const books = [
     { number: 1, title: "O Sussurro da Alma", subtitle: "Despertando Seu Diálogo Interior" },
@@ -85,6 +94,7 @@ export default function Home() {
             <Button
               size="lg"
               className="bg-accent text-accent-foreground hover:bg-accent/90 text-lg px-8"
+              onClick={() => handleCTAClick(ANALYTICS_EVENTS.CTA_HERO_CLICKED)}
             >
               Garantir Minha Coleção <ArrowRight className="ml-2" />
             </Button>
@@ -92,6 +102,7 @@ export default function Home() {
               size="lg"
               variant="outline"
               className="border-accent text-accent hover:bg-accent/10 text-lg px-8"
+              onClick={() => handleCTAClick(ANALYTICS_EVENTS.CTA_HERO_LEARN_MORE)}
             >
               Saber Mais
             </Button>
@@ -283,6 +294,7 @@ export default function Home() {
             <Button
               size="lg"
               className="bg-accent text-accent-foreground hover:bg-accent/90 text-lg px-8"
+              onClick={() => handleCTAClick(ANALYTICS_EVENTS.CTA_BOTTOM_CLICKED)}
             >
               Garantir Minha Coleção <ArrowRight className="ml-2" />
             </Button>
