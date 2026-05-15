@@ -16,7 +16,8 @@ const HERO_FRAMES: string[] = [];
 export default function Home() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [frameProgress, setFrameProgress] = useState(0);
-  const linkAcesso = "/login?next=%2Fapp";
+  const [animateHeroTitle, setAnimateHeroTitle] = useState(false);
+  const linkAcesso = "/checkout";
   const heroParallaxRef = useRef<HTMLDivElement | null>(null);
   const preloadedFramesRef = useRef<Set<number>>(new Set());
 
@@ -26,6 +27,17 @@ export default function Home() {
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) {
+      setAnimateHeroTitle(true);
+      return;
+    }
+
+    const id = window.requestAnimationFrame(() => setAnimateHeroTitle(true));
+    return () => window.cancelAnimationFrame(id);
   }, []);
 
   useEffect(() => {
@@ -75,8 +87,8 @@ export default function Home() {
     if (prefersReducedMotion) return;
 
     const isMobile = window.matchMedia("(max-width: 768px)").matches;
-    const speed = isMobile ? 0.12 : 0.2;
-    const smoothing = isMobile ? 0.1 : 0.14;
+    const speed = isMobile ? 0.22 : 0.35;
+    const smoothing = isMobile ? 0.14 : 0.2;
 
     let target = 0;
     let current = 0;
@@ -88,7 +100,7 @@ export default function Home() {
 
     const animate = () => {
       current += (target - current) * smoothing;
-      element.style.transform = `translate3d(0, ${current}px, 0) scale(1.08)`;
+      element.style.transform = `translate3d(0, ${-current}px, 0) scale(1.12)`;
       animationId = window.requestAnimationFrame(animate);
     };
 
@@ -122,8 +134,16 @@ export default function Home() {
     { icon: "✨", title: "Propósito", description: "Encontre o significado real da sua jornada" },
   ];
 
+  const heroTitleWords = ["Descubra", "a", "Voz", "que", "Fala", "Só", "com", "Você"];
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="h-screen overflow-y-auto snap-y snap-mandatory scroll-smooth bg-background text-foreground">
+      <style>{`
+        @keyframes splitRise {
+          from { opacity: 0; transform: translateY(18px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
       {/* Navbar */}
       <nav
         className={`fixed top-0 w-full z-50 transition-all duration-300 ${
@@ -141,7 +161,7 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
+      <section className="relative min-h-screen snap-start flex items-center justify-center pt-20 overflow-hidden">
         <div
           ref={heroParallaxRef}
           className="absolute inset-0 bg-cover bg-center"
@@ -171,11 +191,23 @@ export default function Home() {
         </div>
 
         <div className="relative z-10 container max-w-4xl text-center">
-          <h1
-            className="text-6xl md:text-7xl font-bold mb-6 leading-tight"
-            style={{ fontFamily: "Playfair Display" }}
-          >
-            Descubra a Voz que Fala <span className="text-accent">Só com Você</span>
+          <h1 className="text-6xl md:text-7xl font-bold mb-6 leading-tight" style={{ fontFamily: "Playfair Display" }}>
+            {heroTitleWords.map((word, index) => (
+              <span
+                key={`${word}-${index}`}
+                className={word === "Só" || word === "Você" ? "text-accent inline-block mr-3" : "inline-block mr-3"}
+                style={{
+                  opacity: animateHeroTitle ? 1 : 0,
+                  transform: animateHeroTitle ? "translateY(0)" : "translateY(18px)",
+                  transitionProperty: "opacity, transform",
+                  transitionDuration: "620ms",
+                  transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+                  transitionDelay: `${index * 90}ms`,
+                }}
+              >
+                {word}
+              </span>
+            ))}
           </h1>
           <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-2xl mx-auto">
             Uma coleção de 10 livros que transformam o monólogo confuso em uma ferramenta de poder, clareza e cura emocional.
@@ -212,7 +244,7 @@ export default function Home() {
       <div className="h-1 bg-gradient-to-r from-transparent via-accent to-transparent"></div>
 
       {/* Problem Section */}
-      <section className="py-20 bg-secondary/30">
+      <section className="py-20 snap-start bg-secondary/30">
         <div className="container max-w-4xl">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
@@ -259,7 +291,7 @@ export default function Home() {
       <div className="h-1 bg-gradient-to-r from-transparent via-accent to-transparent"></div>
 
       {/* Solution Section */}
-      <section className="py-20">
+      <section className="py-20 snap-start">
         <div className="container max-w-4xl">
           <h2
             className="text-5xl font-bold mb-12 text-center text-accent"
@@ -300,7 +332,7 @@ export default function Home() {
       <div className="h-1 bg-gradient-to-r from-transparent via-accent to-transparent"></div>
 
       {/* Books Collection */}
-      <section className="py-20 bg-secondary/30">
+      <section className="py-20 snap-start bg-secondary/30">
         <div className="container">
           <h2
             className="text-5xl font-bold mb-12 text-center text-accent"
@@ -330,7 +362,7 @@ export default function Home() {
       <div className="h-1 bg-gradient-to-r from-transparent via-accent to-transparent"></div>
 
       {/* About Author */}
-      <section className="py-20">
+      <section className="py-20 snap-start">
         <div className="container max-w-4xl">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="relative h-96 rounded-lg overflow-hidden">
@@ -370,7 +402,7 @@ export default function Home() {
       <div className="h-1 bg-gradient-to-r from-transparent via-accent to-transparent"></div>
 
       {/* CTA Section */}
-      <section className="py-20 bg-secondary/30">
+      <section className="py-20 snap-start bg-secondary/30">
         <div className="container max-w-2xl text-center">
           <h2
             className="text-5xl font-bold mb-6 text-accent"
@@ -399,7 +431,7 @@ export default function Home() {
       </section>
 
       {/* Newsletter Section */}
-      <section className="bg-secondary/50 py-16 border-t border-border">
+      <section className="bg-secondary/50 py-16 snap-start border-t border-border">
         <div className="container max-w-2xl">
           <h2
             className="text-4xl font-bold mb-4 text-center text-accent"
@@ -415,7 +447,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-card border-t border-border py-12">
+      <footer className="bg-card snap-start border-t border-border py-12">
         <div className="container">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
@@ -455,7 +487,24 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t border-border pt-8 text-center text-sm text-gray-400">
-            <p>&copy; 2026 Solilóquios para a Alma. Todos os direitos reservados.</p>
+            <p className="text-accent font-semibold mb-2">Desenvolvido por</p>
+            <p>© Automações Comerciais Integradas! 2026 ⚙️ Todos os direitos reservados.</p>
+            <p className="mt-1">
+              <a href="mailto:contato@automacoescomerciais.com.br" className="hover:text-accent transition">
+                contato@automacoescomerciais.com.br
+              </a>
+            </p>
+            <p className="mt-1">
+              Francisco Queiroz 📱 WhatsApp:{" "}
+              <a
+                href="https://wa.me/558894227586"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-accent transition"
+              >
+                https://wa.me/558894227586
+              </a>
+            </p>
           </div>
         </div>
       </footer>

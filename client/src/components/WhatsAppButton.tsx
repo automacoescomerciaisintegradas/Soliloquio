@@ -1,45 +1,41 @@
-import { MessageCircle } from "lucide-react";
-import { useState } from "react";
+import { useLocation } from "wouter";
 
 /**
- * WhatsAppButton Component
- * Botão flutuante do WhatsApp no canto inferior direito
- * Design: Minimalismo Cinematográfico com animação suave
+ * WhatsAppButton Component (skill: whatsapp-button)
+ * Botão flutuante com pulso, oculto no checkout.
  */
 
 export default function WhatsAppButton() {
-  const [isHovered, setIsHovered] = useState(false);
-
-  // Número do WhatsApp (formato: +55 41 92062-238)
-  const phoneNumber = "5541920622238";
-  const message = "Olá! Gostaria de saber mais sobre a coleção 'Solilóquios para a Alma'.";
-  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+  const [location] = useLocation();
+  if (location.startsWith("/checkout")) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-40">
-      {/* Tooltip */}
-      {isHovered && (
-        <div className="absolute bottom-16 right-0 bg-card border border-accent rounded-lg px-4 py-2 whitespace-nowrap text-sm text-foreground shadow-lg animate-in fade-in duration-200">
-          <p className="font-semibold text-accent">Fale conosco!</p>
-          <p className="text-gray-400">Responderemos em breve</p>
-        </div>
-      )}
-
-      {/* Button */}
-      <a
-        href={whatsappUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        className="flex items-center justify-center w-14 h-14 bg-green-500 hover:bg-green-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 group"
-        aria-label="Contatar via WhatsApp"
+    <a
+      className="whatsapp-float-button pulsating-button"
+      href="https://api.whatsapp.com/send?phone=5541992062238"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Falar no WhatsApp"
+    >
+      <svg
+        viewBox="0 0 1219.547 1225.016"
+        height="2rem"
+        width="2rem"
+        style={{ pointerEvents: "none", display: "block", height: 40, width: 40 }}
       >
-        <MessageCircle size={24} className="group-hover:scale-110 transition-transform" />
-      </a>
-
-      {/* Pulse Animation */}
-      <div className="absolute inset-0 w-14 h-14 bg-green-500 rounded-full animate-pulse opacity-20"></div>
-    </div>
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          style={{ fill: "#FFF" }}
+          fill="#FFF"
+          d="M462.273 349.294c-11.234-24.977-23.062-25.477-33.75-25.914-8.742-.375-18.75-.352-28.742-.352-10 0-26.25 3.758-39.992 18.766-13.75 15.008-52.5 51.289-52.5 125.078 0 73.797 53.75 145.102 61.242 155.117 7.5 10 103.758 166.266 256.203 226.383 126.695 49.961 152.477 40.023 179.977 37.523s88.734-36.273 101.234-71.297c12.5-35.016 12.5-65.031 8.75-71.305-3.75-6.25-13.75-10-28.75-17.5s-88.734-43.789-102.484-48.789-23.75-7.5-33.75 7.516c-10 15-38.727 48.773-47.477 58.773-8.75 10.023-17.5 11.273-32.5 3.773-15-7.523-63.305-23.344-120.609-74.438-44.586-39.75-74.688-88.844-83.438-103.859-8.75-15-.938-23.125 6.586-30.602 6.734-6.719 15-17.508 22.5-26.266 7.484-8.758 9.984-15.008 14.984-25.008 5-10.016 2.5-18.773-1.25-26.273s-32.898-81.67-46.234-111.326z"
+        />
+        <path
+          style={{ fill: "#FFFFFF" }}
+          fill="#FFF"
+          d="M1036.898 176.091C923.562 62.677 772.859.185 612.297.114 281.43.114 12.172 269.286 12.039 600.137 12 705.896 39.633 809.13 92.156 900.13L7 1211.067l318.203-83.438c87.672 47.812 186.383 73.008 286.836 73.047h.255.003c330.812 0 600.109-269.219 600.25-600.055.055-160.343-62.328-311.108-175.649-424.53zm-424.601 923.242h-.195c-89.539-.047-177.344-24.086-253.93-69.531l-18.227-10.805-188.828 49.508 50.414-184.039-11.875-18.867c-49.945-79.414-76.312-171.188-76.273-265.422.109-274.992 223.906-498.711 499.102-498.711 133.266.055 258.516 52 352.719 146.266 94.195 94.266 146.031 219.578 145.992 352.852-.118 274.999-223.923 498.749-498.899 498.749z"
+        />
+      </svg>
+    </a>
   );
 }

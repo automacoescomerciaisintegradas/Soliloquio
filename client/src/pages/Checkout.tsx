@@ -548,9 +548,25 @@ export default function Checkout() {
       </section>
 
       <footer className="border-t border-border bg-card/80">
-        <div className="container py-8 flex flex-col md:flex-row gap-3 md:items-center md:justify-between text-sm text-gray-400">
-          <p>Contato: jornalista0013093@gmail.com</p>
-          <p>Entrega digital. Direitos autorais reservados.</p>
+        <div className="container py-8 text-sm text-gray-400 space-y-2">
+          <p className="text-accent font-semibold">Desenvolvido por</p>
+          <p>© Automações Comerciais Integradas! 2026 ⚙️ Todos os direitos reservados.</p>
+          <p>
+            <a href="mailto:contato@automacoescomerciais.com.br" className="hover:text-accent transition">
+              contato@automacoescomerciais.com.br
+            </a>
+          </p>
+          <p>
+            Francisco Queiroz 📱 WhatsApp:{" "}
+            <a
+              href="https://wa.me/558894227586"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-accent transition"
+            >
+              https://wa.me/558894227586
+            </a>
+          </p>
         </div>
       </footer>
     </div>
