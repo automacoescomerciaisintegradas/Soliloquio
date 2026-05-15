@@ -1,8 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Check, Star } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import NewsletterForm from "@/components/NewsletterForm";
 import { Link } from "wouter";
+
+const HERO_FRAMES: string[] = [];
 
 /**
  * Landing Page: Solilóquios para a Alma
@@ -13,7 +15,10 @@ import { Link } from "wouter";
 
 export default function Home() {
   const [isScrolled, setIsScrolled] = useState(false);
+  const [frameProgress, setFrameProgress] = useState(0);
   const linkAcesso = "/login?next=%2Fapp";
+  const heroParallaxRef = useRef<HTMLDivElement | null>(null);
+  const preloadedFramesRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,6 +26,80 @@ export default function Home() {
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (HERO_FRAMES.length < 2) return;
+
+    const onScroll = () => {
+      const maxScrollable = Math.max(window.innerHeight, 1);
+      const progress = Math.min(Math.max(window.scrollY / maxScrollable, 0), 1);
+      setFrameProgress(progress);
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const frameFloatIndex = frameProgress * Math.max(HERO_FRAMES.length - 1, 1);
+  const baseFrameIndex = Math.floor(frameFloatIndex);
+  const nextFrameIndex = Math.min(baseFrameIndex + 1, HERO_FRAMES.length - 1);
+  const nextFrameOpacity = frameFloatIndex - baseFrameIndex;
+
+  useEffect(() => {
+    if (HERO_FRAMES.length < 2) return;
+
+    const preloadRadius = 6;
+    const start = Math.max(0, baseFrameIndex - preloadRadius);
+    const end = Math.min(HERO_FRAMES.length - 1, baseFrameIndex + preloadRadius);
+
+    for (let i = start; i <= end; i++) {
+      if (preloadedFramesRef.current.has(i)) continue;
+      const src = HERO_FRAMES[i];
+      if (!src) continue;
+
+      const img = new Image();
+      img.decoding = "async";
+      img.loading = "eager";
+      img.src = src;
+      preloadedFramesRef.current.add(i);
+    }
+  }, [baseFrameIndex]);
+
+  useEffect(() => {
+    const element = heroParallaxRef.current;
+    if (!element) return;
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) return;
+
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    const speed = isMobile ? 0.12 : 0.2;
+    const smoothing = isMobile ? 0.1 : 0.14;
+
+    let target = 0;
+    let current = 0;
+    let animationId = 0;
+
+    const onScroll = () => {
+      target = window.scrollY * speed;
+    };
+
+    const animate = () => {
+      current += (target - current) * smoothing;
+      element.style.transform = `translate3d(0, ${current}px, 0) scale(1.08)`;
+      animationId = window.requestAnimationFrame(animate);
+    };
+
+    onScroll();
+    animationId = window.requestAnimationFrame(animate);
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.cancelAnimationFrame(animationId);
+    };
   }, []);
 
   const books = [
@@ -64,12 +143,30 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
         <div
+          ref={heroParallaxRef}
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage: "url('https://d2xsxph8kpxj0f.cloudfront.net/310519663079504772/XKA39DEtKWhMNu9q56qiGT/hero_background-3ChqDpwMSZypxgrA5MGGZC.webp')",
-            backgroundAttachment: "fixed",
+            willChange: "transform",
           }}
         >
+          {HERO_FRAMES.length > 0 && (
+            <>
+              <img
+                src={HERO_FRAMES[baseFrameIndex]}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              <img
+                src={HERO_FRAMES[nextFrameIndex]}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ opacity: nextFrameOpacity }}
+              />
+            </>
+          )}
           <div className="absolute inset-0 bg-black/60"></div>
         </div>
 
