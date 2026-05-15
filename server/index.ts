@@ -118,6 +118,9 @@ const checkoutRateLimitMax = Number(process.env.CHECKOUT_RATE_LIMIT_MAX || 12);
 const checkoutCollectionPriceCents = Number(process.env.PRODUCT_PRICE_CENTS || 4970);
 const checkoutVolumePriceCents = Number(process.env.PRODUCT_PRICE_CENTS_VOLUME || 970);
 const checkoutSinglePriceCents = Number(process.env.PRODUCT_PRICE_CENTS_SINGLE || 1490);
+const manualPixCopyPaste = (process.env.PIX_MANUAL_COPY_PASTE || "").trim();
+const manualPixQrBase64 = (process.env.PIX_MANUAL_QR_BASE64 || "").trim();
+const manualPixAutoApprove = String(process.env.PIX_MANUAL_AUTO_APPROVE || "false").trim() === "true";
 
 const checkoutDataDir = path.resolve(__dirname, "..", "data");
 const checkoutPaymentsFile = path.join(checkoutDataDir, "pix-payments.json");
@@ -440,6 +443,10 @@ function validarWebhookPushinPay(req: express.Request) {
     .map(v => String(v).trim());
 
   return candidatos.includes(pushinpayWebhookSecret);
+}
+
+function gerarChargeIdLocal() {
+  return `${Date.now()}${Math.floor(Math.random() * 100000)}`;
 }
 
 function normalizarTelefoneWhatsapp(telefone: string) {
@@ -1283,15 +1290,23 @@ async function startServer() {
       return res.status(400).json({ ok: false, message: "Produto selecionado nao encontrado." });
     }
 
-    if (!pushinpayToken) {
+    const usarPixManual = !pushinpayToken && !!manualPixCopyPaste;
+    if (!pushinpayToken && !usarPixManual) {
       return res.status(500).json({
         ok: false,
-        message: "Pagamento PIX indisponivel. Configure PUSHINPAY_TOKEN no backend.",
+        message:
+          "Pagamento PIX indisponivel. Configure PUSHINPAY_TOKEN ou PIX_MANUAL_COPY_PASTE no backend.",
       });
     }
 
     try {
-      const created = await criarCobrancaPushinPay({ email, product, ip });
+      const created = usarPixManual
+        ? {
+            chargeId: gerarChargeIdLocal(),
+            pixCode: manualPixCopyPaste,
+            qrCodeImage: toDataUrlQrCode(manualPixQrBase64),
+          }
+        : await criarCobrancaPushinPay({ email, product, ip });
       const agora = new Date();
       const expiresAt = new Date(
         agora.getTime() +
@@ -1308,11 +1323,11 @@ async function startServer() {
         productId: product.id,
         productTitle: product.title,
         amountCents: product.priceCents,
-        status: "pending",
+        status: manualPixAutoApprove ? "paid" : "pending",
         createdAt: agora.toISOString(),
         updatedAt: agora.toISOString(),
         expiresAt: expiresAt.toISOString(),
-        paidAt: null,
+        paidAt: manualPixAutoApprove ? agora.toISOString() : null,
         ip,
         userAgent: String(req.header("user-agent") || "") || null,
       };
@@ -1332,9 +1347,10 @@ async function startServer() {
         charge_id: created.chargeId,
         qr_code_image: created.qrCodeImage || null,
         pix_copy_paste: created.pixCode,
-        status: "pending",
+        status: manualPixAutoApprove ? "paid" : "pending",
         expires_at: registro.expiresAt,
         brand_name: checkoutBrandName,
+        payment_mode: usarPixManual ? "manual_pix" : "pushinpay",
         product: {
           id: product.id,
           title: product.title,

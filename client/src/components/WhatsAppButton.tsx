@@ -11,7 +11,7 @@ export default function WhatsAppButton() {
   const [isHovered, setIsHovered] = useState(false);
 
   // Número do WhatsApp (formato: +55 41 92062-238)
-  const phoneNumber = "5541920622238";
+  const phoneNumber = "5541992062238";
   const message = "Olá! Gostaria de saber mais sobre a coleção 'Solilóquios para a Alma'.";
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
 
