@@ -1,5 +1,6 @@
 import express from "express";
 import { createServer } from "http";
+import fs from "node:fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
@@ -72,6 +73,374 @@ type MetaIntegrationInput = {
   onboardingUrl?: string;
   apiVersion?: string;
 };
+
+type CheckoutProductType = "collection" | "volume" | "single";
+type CheckoutPaymentStatus = "pending" | "paid" | "expired" | "canceled";
+
+type CheckoutProduct = {
+  id: string;
+  type: CheckoutProductType;
+  title: string;
+  subtitle: string;
+  author: string;
+  description: string;
+  priceCents: number;
+  volume?: number;
+};
+
+type CheckoutPaymentRecord = {
+  chargeId: string;
+  email: string;
+  productId: string;
+  productTitle: string;
+  amountCents: number;
+  status: CheckoutPaymentStatus;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  paidAt: string | null;
+  ip: string;
+  userAgent: string | null;
+};
+
+const pushinpayToken = (process.env.PUSHINPAY_TOKEN || "").trim();
+const pushinpayBaseUrl = (process.env.PUSHINPAY_BASE_URL || "https://api.pushinpay.com.br/api")
+  .trim()
+  .replace(/\/+$/, "");
+const pushinpayWebhookSecret = (process.env.PUSHINPAY_WEBHOOK_SECRET || "").trim();
+const pushinpayWebhookUrl = (process.env.PUSHINPAY_WEBHOOK_URL || "").trim();
+const checkoutBrandName = (process.env.BRAND_NAME || "Nate Systems").trim();
+const checkoutProductName = (process.env.PRODUCT_NAME || "Coleção Solilóquios para a Alma").trim();
+const checkoutDeliveryUrl = (process.env.DELIVERY_URL || "https://drive.google.com/").trim();
+const checkoutPixExpiresMinutes = Number(process.env.PIX_CHARGE_EXPIRES_MINUTES || 30);
+const checkoutRateLimitWindowMs = Number(process.env.CHECKOUT_RATE_LIMIT_WINDOW_MS || 60000);
+const checkoutRateLimitMax = Number(process.env.CHECKOUT_RATE_LIMIT_MAX || 12);
+const checkoutCollectionPriceCents = Number(process.env.PRODUCT_PRICE_CENTS || 4970);
+const checkoutVolumePriceCents = Number(process.env.PRODUCT_PRICE_CENTS_VOLUME || 970);
+const checkoutSinglePriceCents = Number(process.env.PRODUCT_PRICE_CENTS_SINGLE || 1490);
+
+const checkoutDataDir = path.resolve(__dirname, "..", "data");
+const checkoutPaymentsFile = path.join(checkoutDataDir, "pix-payments.json");
+const checkoutAuditFile = path.join(checkoutDataDir, "pix-audit.log");
+const checkoutEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const checkoutPaymentsByChargeId = new Map<string, CheckoutPaymentRecord>();
+const checkoutRateLimitByIp = new Map<string, number[]>();
+
+const checkoutVolumes = [
+  { volume: 1, title: "O Sussurro da Alma", subtitle: "Despertando Seu Diálogo Interior" },
+  { volume: 2, title: "Mente Aliada", subtitle: "Transformando o Diálogo Interno que Sabota" },
+  { volume: 3, title: "A Arte da Escuta", subtitle: "Solilóquio e Inteligência Emocional" },
+  { volume: 4, title: "Cura Interior", subtitle: "Solilóquios para a Paz da Alma" },
+  { volume: 5, title: "O Poder da Pausa", subtitle: "Solilóquio para uma Vida com Propósito" },
+  { volume: 6, title: "Hábitos da Mente", subtitle: "Solilóquios para o Sucesso Duradouro" },
+  { volume: 7, title: "Conexão Essencial", subtitle: "Solilóquio e o Impacto das Redes Sociais" },
+  { volume: 8, title: "A Voz do Criador", subtitle: "Solilóquio e a Expressão Criativa" },
+  { volume: 9, title: "Resiliência Interior", subtitle: "Solilóquios para Superar Desafios" },
+  { volume: 10, title: "O Legado do Silêncio", subtitle: "Solilóquio e a Sabedoria Ancestral" },
+] as const;
+
+const checkoutCatalogExtras: CheckoutProduct[] = [
+  {
+    id: "antonio-bandeira-dialogos-do-agora",
+    type: "single",
+    title: "Diálogos do Agora",
+    subtitle: "Reflexões para escolhas conscientes no dia a dia",
+    author: "Antonio Bandeira",
+    description: "Livro extra para fortalecer presença, foco e decisão com clareza emocional.",
+    priceCents: checkoutSinglePriceCents,
+  },
+  {
+    id: "beatriz-moreira-arquitetura-da-calma",
+    type: "single",
+    title: "Arquitetura da Calma",
+    subtitle: "Como reduzir ansiedade com rituais simples",
+    author: "Beatriz Moreira",
+    description: "Guia prático de organização mental para uma rotina mais leve e intencional.",
+    priceCents: checkoutSinglePriceCents,
+  },
+  {
+    id: "rafael-monteiro-coragem-de-recomecar",
+    type: "single",
+    title: "Coragem de Recomeçar",
+    subtitle: "Mentalidade e resiliencia para novos ciclos",
+    author: "Rafael Monteiro",
+    description: "Estratégias para superar travas, retomar energia e construir novos resultados.",
+    priceCents: checkoutSinglePriceCents,
+  },
+];
+
+function obterCatalogoCheckout() {
+  const collectionProduct: CheckoutProduct = {
+    id: "colecao-10-volumes",
+    type: "collection",
+    title: checkoutProductName,
+    subtitle: "Coleção completa com os 10 volumes oficiais",
+    author: "Antonio Bandeira",
+    description:
+      "Os 10 volumes que transformam o monólogo confuso em poder, clareza e cura emocional.",
+    priceCents: checkoutCollectionPriceCents,
+  };
+
+  const volumeProducts: CheckoutProduct[] = checkoutVolumes.map(item => ({
+    id: `vol-${String(item.volume).padStart(2, "0")}`,
+    type: "volume",
+    title: `Vol. ${item.volume} - ${item.title}`,
+    subtitle: item.subtitle,
+    author: "Antonio Bandeira",
+    description: `Compra individual do volume ${item.volume}.`,
+    volume: item.volume,
+    priceCents: checkoutVolumePriceCents,
+  }));
+
+  return [collectionProduct, ...volumeProducts, ...checkoutCatalogExtras];
+}
+
+function garantirDiretorioCheckout() {
+  if (!fs.existsSync(checkoutDataDir)) {
+    fs.mkdirSync(checkoutDataDir, { recursive: true });
+  }
+}
+
+function carregarPagamentosCheckout() {
+  garantirDiretorioCheckout();
+  if (!fs.existsSync(checkoutPaymentsFile)) return;
+
+  try {
+    const raw = fs.readFileSync(checkoutPaymentsFile, "utf8");
+    const parsed = parseJsonSeguro(raw);
+    if (!Array.isArray(parsed)) return;
+
+    checkoutPaymentsByChargeId.clear();
+    for (const item of parsed) {
+      const registro = item as Partial<CheckoutPaymentRecord>;
+      if (!registro.chargeId) continue;
+
+      checkoutPaymentsByChargeId.set(registro.chargeId, {
+        chargeId: String(registro.chargeId),
+        email: String(registro.email || ""),
+        productId: String(registro.productId || ""),
+        productTitle: String(registro.productTitle || ""),
+        amountCents: Number(registro.amountCents || 0),
+        status: (registro.status as CheckoutPaymentStatus) || "pending",
+        createdAt: String(registro.createdAt || new Date().toISOString()),
+        updatedAt: String(registro.updatedAt || new Date().toISOString()),
+        expiresAt: String(registro.expiresAt || new Date().toISOString()),
+        paidAt: registro.paidAt ? String(registro.paidAt) : null,
+        ip: String(registro.ip || ""),
+        userAgent: registro.userAgent ? String(registro.userAgent) : null,
+      });
+    }
+  } catch (error) {
+    console.error("[CHECKOUT_LOAD_ERROR]", error);
+  }
+}
+
+function salvarPagamentosCheckout() {
+  garantirDiretorioCheckout();
+  const payload = JSON.stringify(Array.from(checkoutPaymentsByChargeId.values()), null, 2);
+  fs.writeFileSync(checkoutPaymentsFile, payload, "utf8");
+}
+
+function registrarAuditoriaCheckout(evento: string, data: Record<string, unknown>) {
+  try {
+    garantirDiretorioCheckout();
+    const linha = JSON.stringify({
+      timestamp: new Date().toISOString(),
+      event: evento,
+      ...data,
+    });
+    fs.appendFileSync(checkoutAuditFile, `${linha}\n`, "utf8");
+  } catch (error) {
+    console.error("[CHECKOUT_AUDIT_ERROR]", error);
+  }
+}
+
+function mascararEmail(email: string) {
+  const [local, dominio] = email.split("@");
+  if (!local || !dominio) return email;
+  if (local.length <= 2) return `**@${dominio}`;
+  return `${local.slice(0, 2)}***@${dominio}`;
+}
+
+function obterIpRequisicao(req: express.Request) {
+  const forwarded = String(req.headers["x-forwarded-for"] || "")
+    .split(",")
+    .map(v => v.trim())
+    .find(Boolean);
+  return (
+    forwarded ||
+    req.socket.remoteAddress ||
+    String(req.headers["x-real-ip"] || "") ||
+    "unknown"
+  );
+}
+
+function verificarRateLimitCheckout(ip: string) {
+  const agora = Date.now();
+  const janela = Number.isFinite(checkoutRateLimitWindowMs) && checkoutRateLimitWindowMs > 0
+    ? checkoutRateLimitWindowMs
+    : 60000;
+  const limite = Number.isFinite(checkoutRateLimitMax) && checkoutRateLimitMax > 0
+    ? checkoutRateLimitMax
+    : 12;
+
+  const historico = checkoutRateLimitByIp.get(ip) || [];
+  const atualizados = historico.filter(ts => agora - ts <= janela);
+
+  if (atualizados.length >= limite) {
+    checkoutRateLimitByIp.set(ip, atualizados);
+    return { permitido: false, restantes: 0, retryAfterMs: janela - (agora - atualizados[0]) };
+  }
+
+  atualizados.push(agora);
+  checkoutRateLimitByIp.set(ip, atualizados);
+
+  return { permitido: true, restantes: limite - atualizados.length, retryAfterMs: 0 };
+}
+
+function normalizarStatusPagamento(statusRaw: unknown): CheckoutPaymentStatus {
+  const status = String(statusRaw || "").toLowerCase().trim();
+  if (!status) return "pending";
+  if (status.includes("paid") || status.includes("approved") || status.includes("success")) {
+    return "paid";
+  }
+  if (status.includes("expire")) return "expired";
+  if (status.includes("cancel") || status.includes("refused") || status.includes("failed")) {
+    return "canceled";
+  }
+  return "pending";
+}
+
+function extrairValorTexto(input: unknown) {
+  if (typeof input !== "string") return "";
+  return input.trim();
+}
+
+function toDataUrlQrCode(valor: string) {
+  const trimmed = valor.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("data:image")) return trimmed;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  return `data:image/png;base64,${trimmed}`;
+}
+
+async function criarCobrancaPushinPay(params: {
+  email: string;
+  product: CheckoutProduct;
+  ip: string;
+}) {
+  const payload: Record<string, unknown> = {
+    value: params.product.priceCents,
+    description: `${checkoutBrandName} - ${params.product.title}`,
+    payer_email: params.email,
+    payer_name: params.email.split("@")[0],
+  };
+
+  if (pushinpayWebhookUrl) {
+    payload["webhook_url"] = pushinpayWebhookUrl;
+  }
+
+  const response = await fetch(`${pushinpayBaseUrl}/pix/cashIn`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${pushinpayToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const rawText = await response.text();
+  const data = (parseJsonSeguro(rawText) || {}) as Record<string, unknown>;
+
+  if (!response.ok) {
+    throw new Error(data["message"] ? String(data["message"]) : rawText || "Falha na PushinPay.");
+  }
+
+  const pixDetails =
+    (data["pix_details"] as Record<string, unknown> | undefined) ||
+    (data["pix"] as Record<string, unknown> | undefined) ||
+    {};
+
+  const chargeId =
+    extrairValorTexto(data["id"]) ||
+    extrairValorTexto(data["charge_id"]) ||
+    extrairValorTexto((data["transaction"] as Record<string, unknown> | undefined)?.["id"]) ||
+    extrairValorTexto(pixDetails["id"]);
+
+  const pixCode =
+    extrairValorTexto(data["pix_copy_paste"]) ||
+    extrairValorTexto(data["pix_code"]) ||
+    extrairValorTexto(data["qr_code"]) ||
+    extrairValorTexto(data["emv"]) ||
+    extrairValorTexto(pixDetails["emv"]);
+
+  const qrCodeImageRaw =
+    extrairValorTexto(data["qr_code_base64"]) ||
+    extrairValorTexto(data["qr_code_image"]) ||
+    extrairValorTexto(pixDetails["qr_code_base64"]) ||
+    extrairValorTexto(pixDetails["qr_code"]) ||
+    "";
+
+  const qrCodeImage = toDataUrlQrCode(qrCodeImageRaw);
+
+  if (!chargeId || !pixCode) {
+    throw new Error("A PushinPay nao retornou charge_id ou codigo PIX.");
+  }
+
+  registrarAuditoriaCheckout("pushinpay.charge.created", {
+    ip: params.ip,
+    charge_id: chargeId,
+    product_id: params.product.id,
+    email: mascararEmail(params.email),
+  });
+
+  return {
+    chargeId,
+    pixCode,
+    qrCodeImage,
+  };
+}
+
+async function consultarStatusPushinPay(chargeId: string) {
+  const response = await fetch(`${pushinpayBaseUrl}/transaction/${chargeId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${pushinpayToken}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const rawText = await response.text();
+  const data = (parseJsonSeguro(rawText) || {}) as Record<string, unknown>;
+  if (!response.ok) {
+    throw new Error(data["message"] ? String(data["message"]) : rawText || "Erro ao consultar status.");
+  }
+
+  const statusRaw =
+    data["status"] ||
+    (data["transaction"] as Record<string, unknown> | undefined)?.["status"] ||
+    (data["data"] as Record<string, unknown> | undefined)?.["status"] ||
+    "";
+
+  return normalizarStatusPagamento(statusRaw);
+}
+
+function validarWebhookPushinPay(req: express.Request) {
+  if (!pushinpayWebhookSecret) return true;
+
+  const authorization = String(req.header("authorization") || "");
+  const authToken = authorization.replace(/^Bearer\s+/i, "").trim();
+  const candidatos = [
+    req.header("x-pushinpay-secret"),
+    req.header("x-webhook-secret"),
+    req.header("x-signature"),
+    authToken,
+  ]
+    .filter(Boolean)
+    .map(v => String(v).trim());
+
+  return candidatos.includes(pushinpayWebhookSecret);
+}
 
 function normalizarTelefoneWhatsapp(telefone: string) {
   return telefone.replace(/\D/g, "");
@@ -863,6 +1232,237 @@ async function encaminharMultipartParaWebhook(params: {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  carregarPagamentosCheckout();
+
+  app.get("/api/catalog", (_req, res) => {
+    const products = obterCatalogoCheckout();
+    return res.status(200).json({
+      brand_name: checkoutBrandName,
+      product_name: checkoutProductName,
+      currency: "BRL",
+      products: products.map(product => ({
+        id: product.id,
+        type: product.type,
+        title: product.title,
+        subtitle: product.subtitle,
+        author: product.author,
+        description: product.description,
+        volume: product.volume || null,
+        price_cents: product.priceCents,
+      })),
+    });
+  });
+
+  app.post("/api/create-payment", express.json(), async (req, res) => {
+    const ip = obterIpRequisicao(req);
+    const rateLimit = verificarRateLimitCheckout(ip);
+    if (!rateLimit.permitido) {
+      const retryAfterSeconds = Math.ceil(rateLimit.retryAfterMs / 1000);
+      return res.status(429).json({
+        ok: false,
+        message: "Muitas tentativas em pouco tempo. Aguarde e tente novamente.",
+        retry_after_seconds: retryAfterSeconds,
+      });
+    }
+
+    const body = (req.body || {}) as {
+      email?: string;
+      product_id?: string;
+    };
+
+    const email = String(body.email || "").trim().toLowerCase();
+    const productId = String(body.product_id || "").trim();
+
+    if (!checkoutEmailRegex.test(email)) {
+      return res.status(400).json({ ok: false, message: "E-mail invalido." });
+    }
+
+    const catalog = obterCatalogoCheckout();
+    const product = catalog.find(item => item.id === productId);
+    if (!product) {
+      return res.status(400).json({ ok: false, message: "Produto selecionado nao encontrado." });
+    }
+
+    if (!pushinpayToken) {
+      return res.status(500).json({
+        ok: false,
+        message: "Pagamento PIX indisponivel. Configure PUSHINPAY_TOKEN no backend.",
+      });
+    }
+
+    try {
+      const created = await criarCobrancaPushinPay({ email, product, ip });
+      const agora = new Date();
+      const expiresAt = new Date(
+        agora.getTime() +
+          (Number.isFinite(checkoutPixExpiresMinutes) && checkoutPixExpiresMinutes > 0
+            ? checkoutPixExpiresMinutes
+            : 30) *
+            60 *
+            1000,
+      );
+
+      const registro: CheckoutPaymentRecord = {
+        chargeId: created.chargeId,
+        email,
+        productId: product.id,
+        productTitle: product.title,
+        amountCents: product.priceCents,
+        status: "pending",
+        createdAt: agora.toISOString(),
+        updatedAt: agora.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+        paidAt: null,
+        ip,
+        userAgent: String(req.header("user-agent") || "") || null,
+      };
+
+      checkoutPaymentsByChargeId.set(created.chargeId, registro);
+      salvarPagamentosCheckout();
+      registrarAuditoriaCheckout("checkout.payment.created", {
+        charge_id: created.chargeId,
+        product_id: product.id,
+        amount_cents: product.priceCents,
+        email: mascararEmail(email),
+        ip,
+      });
+
+      return res.status(200).json({
+        ok: true,
+        charge_id: created.chargeId,
+        qr_code_image: created.qrCodeImage || null,
+        pix_copy_paste: created.pixCode,
+        status: "pending",
+        expires_at: registro.expiresAt,
+        brand_name: checkoutBrandName,
+        product: {
+          id: product.id,
+          title: product.title,
+          subtitle: product.subtitle,
+          author: product.author,
+          price_cents: product.priceCents,
+        },
+      });
+    } catch (error) {
+      const mensagem = error instanceof Error ? error.message : "Erro ao criar cobranca PIX.";
+      registrarAuditoriaCheckout("checkout.payment.create_failed", {
+        product_id: productId,
+        email: mascararEmail(email),
+        ip,
+        error: mensagem,
+      });
+      return res.status(502).json({ ok: false, message: mensagem });
+    }
+  });
+
+  app.get("/api/payment-status", async (req, res) => {
+    const chargeId = String(req.query.charge_id || "").trim();
+    if (!chargeId) {
+      return res.status(400).json({ ok: false, message: "charge_id obrigatorio." });
+    }
+
+    const registro = checkoutPaymentsByChargeId.get(chargeId);
+    if (!registro) {
+      return res.status(404).json({ ok: false, message: "Cobranca nao encontrada." });
+    }
+
+    const agora = Date.now();
+    const expirou = (timestampMs: number) => timestampMs > new Date(registro.expiresAt).getTime();
+    let statusAtual = registro.status;
+
+    if (statusAtual === "pending" && expirou(agora)) {
+      statusAtual = "expired";
+      registro.status = "expired";
+      registro.updatedAt = new Date().toISOString();
+      checkoutPaymentsByChargeId.set(chargeId, registro);
+      salvarPagamentosCheckout();
+      registrarAuditoriaCheckout("checkout.payment.expired", { charge_id: chargeId });
+    }
+
+    if (statusAtual === "pending" && pushinpayToken) {
+      try {
+        const statusRemoto = await consultarStatusPushinPay(chargeId);
+        if (statusRemoto !== statusAtual) {
+          statusAtual = statusRemoto;
+          registro.status = statusRemoto;
+          registro.updatedAt = new Date().toISOString();
+          if (statusRemoto === "paid") {
+            registro.paidAt = new Date().toISOString();
+          }
+          checkoutPaymentsByChargeId.set(chargeId, registro);
+          salvarPagamentosCheckout();
+          registrarAuditoriaCheckout("checkout.payment.status_updated", {
+            charge_id: chargeId,
+            status: statusRemoto,
+          });
+        }
+      } catch (error) {
+        registrarAuditoriaCheckout("checkout.payment.status_error", {
+          charge_id: chargeId,
+          error: error instanceof Error ? error.message : "Erro desconhecido",
+        });
+      }
+    }
+
+    return res.status(200).json({
+      ok: true,
+      charge_id: chargeId,
+      status: statusAtual,
+      paid: statusAtual === "paid",
+      expires_at: registro.expiresAt,
+      delivery_url: statusAtual === "paid" ? checkoutDeliveryUrl : null,
+      product_title: registro.productTitle,
+      amount_cents: registro.amountCents,
+    });
+  });
+
+  app.post("/api/webhook/pushinpay", express.json(), (req, res) => {
+    if (!validarWebhookPushinPay(req)) {
+      return res.status(403).json({ ok: false, message: "Webhook nao autorizado." });
+    }
+
+    const payload = (req.body || {}) as Record<string, unknown>;
+    const chargeId =
+      extrairValorTexto(payload["id"]) ||
+      extrairValorTexto(payload["charge_id"]) ||
+      extrairValorTexto((payload["transaction"] as Record<string, unknown> | undefined)?.["id"]) ||
+      extrairValorTexto((payload["data"] as Record<string, unknown> | undefined)?.["id"]);
+    const statusRaw =
+      payload["status"] ||
+      (payload["transaction"] as Record<string, unknown> | undefined)?.["status"] ||
+      (payload["data"] as Record<string, unknown> | undefined)?.["status"] ||
+      "";
+
+    if (!chargeId) {
+      return res.status(400).json({ ok: false, message: "Webhook sem charge_id." });
+    }
+
+    const registro = checkoutPaymentsByChargeId.get(chargeId);
+    const novoStatus = normalizarStatusPagamento(statusRaw);
+
+    if (!registro) {
+      registrarAuditoriaCheckout("checkout.webhook.unknown_charge", {
+        charge_id: chargeId,
+        status: novoStatus,
+      });
+      return res.status(202).json({ ok: true, message: "Webhook recebido para charge desconhecida." });
+    }
+
+    registro.status = novoStatus;
+    registro.updatedAt = new Date().toISOString();
+    if (novoStatus === "paid") {
+      registro.paidAt = new Date().toISOString();
+    }
+
+    checkoutPaymentsByChargeId.set(chargeId, registro);
+    salvarPagamentosCheckout();
+    registrarAuditoriaCheckout("checkout.webhook.applied", {
+      charge_id: chargeId,
+      status: novoStatus,
+    });
+
+    return res.status(200).json({ ok: true });
+  });
 
   app.get("/api/whatsapp/webhook", (req, res) => {
     const mode = String(req.query["hub.mode"] || "");

@@ -13,7 +13,7 @@ import { Link } from "wouter";
 
 export default function Home() {
   const [isScrolled, setIsScrolled] = useState(false);
-  const linkAcesso = "/login?next=%2Fapp";
+  const linkAcesso = "/checkout";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -82,6 +82,9 @@ export default function Home() {
           </h1>
           <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-2xl mx-auto">
             Uma coleção de 10 livros que transformam o monólogo confuso em uma ferramenta de poder, clareza e cura emocional.
+          </p>
+          <p className="text-sm text-accent mb-8">
+            Ou compre por volume, por título e por autor.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
