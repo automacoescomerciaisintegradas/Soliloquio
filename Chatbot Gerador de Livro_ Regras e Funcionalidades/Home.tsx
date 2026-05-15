@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Check, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import NewsletterForm from "@/components/NewsletterForm";
-import { Link } from "wouter";
+import { useAnalytics, ANALYTICS_EVENTS } from "@/hooks/useAnalytics";
 
 /**
  * Landing Page: Solilóquios para a Alma
@@ -13,7 +13,7 @@ import { Link } from "wouter";
 
 export default function Home() {
   const [isScrolled, setIsScrolled] = useState(false);
-  const linkAcesso = "/login?next=%2Fapp";
+  const { trackEvent } = useAnalytics();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -22,6 +22,13 @@ export default function Home() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const handleCTAClick = (ctaName: string) => {
+    trackEvent(ctaName, {
+      button_text: "Garantir Minha Coleção",
+      location: "hero_section",
+    });
+  };
 
   const books = [
     { number: 1, title: "O Sussurro da Alma", subtitle: "Despertando Seu Diálogo Interior" },
@@ -55,8 +62,8 @@ export default function Home() {
           <div className="text-2xl font-bold" style={{ fontFamily: "Playfair Display" }}>
             <span className="text-accent">Solilóquios</span>
           </div>
-          <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
-            <Link href={linkAcesso}>Garantir Acesso</Link>
+          <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
+            Garantir Acesso
           </Button>
         </div>
       </nav>
@@ -85,18 +92,17 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
-              asChild
               size="lg"
               className="bg-accent text-accent-foreground hover:bg-accent/90 text-lg px-8"
+              onClick={() => handleCTAClick(ANALYTICS_EVENTS.CTA_HERO_CLICKED)}
             >
-              <Link href={linkAcesso}>
-                Garantir Minha Coleção <ArrowRight className="ml-2" />
-              </Link>
+              Garantir Minha Coleção <ArrowRight className="ml-2" />
             </Button>
             <Button
               size="lg"
               variant="outline"
               className="border-accent text-accent hover:bg-accent/10 text-lg px-8"
+              onClick={() => handleCTAClick(ANALYTICS_EVENTS.CTA_HERO_LEARN_MORE)}
             >
               Saber Mais
             </Button>
@@ -286,13 +292,11 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
-              asChild
               size="lg"
               className="bg-accent text-accent-foreground hover:bg-accent/90 text-lg px-8"
+              onClick={() => handleCTAClick(ANALYTICS_EVENTS.CTA_BOTTOM_CLICKED)}
             >
-              <Link href={linkAcesso}>
-                Garantir Minha Coleção <ArrowRight className="ml-2" />
-              </Link>
+              Garantir Minha Coleção <ArrowRight className="ml-2" />
             </Button>
           </div>
           <p className="text-sm text-gray-400 mt-6">

@@ -1,0 +1,3 @@
+[frontend]  ERROR  Command failed with exit code 1: C:\Program Files\nodejs\node.exe C:\antigravity\soliloquios-landing-page\node_modules\pnpm\bin\pnpm.cjs add pnpm@10.4.1 --loglevel=error --allow-build=@pnpm/exe --no-dangerously-allow-all-builds --config.node-linker=hoisted --config.bin=C:\Users\autom\AppData\Local\pnpm\.tools\pnpm\10.4.1_tmp_8056\bin
+[frontend] For help, run: pnpm help run
+[frontend] finalizou com código 1

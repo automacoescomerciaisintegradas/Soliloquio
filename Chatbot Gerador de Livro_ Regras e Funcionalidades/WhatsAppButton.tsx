@@ -1,5 +1,6 @@
 import { MessageCircle } from "lucide-react";
 import { useState } from "react";
+import { useAnalytics, ANALYTICS_EVENTS } from "@/hooks/useAnalytics";
 
 /**
  * WhatsAppButton Component
@@ -9,6 +10,16 @@ import { useState } from "react";
 
 export default function WhatsAppButton() {
   const [isHovered, setIsHovered] = useState(false);
+  const { trackEvent } = useAnalytics();
+
+  const handleWhatsAppClick = () => {
+    trackEvent(ANALYTICS_EVENTS.WHATSAPP_CLICKED, {
+      button_location: "floating_button",
+    });
+    trackEvent(ANALYTICS_EVENTS.CONVERSION_WHATSAPP, {
+      conversion_type: "whatsapp_contact",
+    });
+  };
 
   // Número do WhatsApp (formato: +55 41 92062-238)
   const phoneNumber = "5541920622238";
@@ -30,6 +41,7 @@ export default function WhatsAppButton() {
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={handleWhatsAppClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         className="flex items-center justify-center w-14 h-14 bg-green-500 hover:bg-green-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 group"

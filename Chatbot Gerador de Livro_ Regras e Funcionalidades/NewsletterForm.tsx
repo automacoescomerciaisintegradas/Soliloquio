@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Mail, CheckCircle, AlertCircle } from "lucide-react";
 import { useState } from "react";
+import { useAnalytics, ANALYTICS_EVENTS } from "@/hooks/useAnalytics";
 
 /**
  * NewsletterForm Component
@@ -12,6 +13,7 @@ export default function NewsletterForm() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const { trackEvent } = useAnalytics();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +35,15 @@ export default function NewsletterForm() {
 
       setStatus("success");
       setMessage("✓ Inscrição confirmada! Verifique seu e-mail.");
+      
+      // Rastrear evento de conversão
+      trackEvent(ANALYTICS_EVENTS.NEWSLETTER_SUBMITTED, {
+        email_domain: email.split("@")[1],
+      });
+      trackEvent(ANALYTICS_EVENTS.CONVERSION_NEWSLETTER, {
+        conversion_type: "newsletter_signup",
+      });
+      
       setEmail("");
 
       // Resetar status após 5 segundos
@@ -43,6 +54,11 @@ export default function NewsletterForm() {
     } catch (error) {
       setStatus("error");
       setMessage("Algo deu errado. Tente novamente.");
+      
+      // Rastrear erro
+      trackEvent(ANALYTICS_EVENTS.NEWSLETTER_ERROR, {
+        error_type: "submission_failed",
+      });
     }
   };
 

@@ -1,0 +1,23 @@
+
+> soliloquios-landing-page@1.0.0 dev C:\antigravity\soliloquios-landing-page
+> node scripts/dev.mjs
+
+[backend]  ECONNREFUSED  request to https://registry.npmjs.org/pnpm/-/pnpm-10.4.1.tgz failed, reason: connect ECONNREFUSED 127.0.0.1:7890
+
+FetchError: request to https://registry.npmjs.org/pnpm/-/pnpm-10.4.1.tgz failed, reason: connect ECONNREFUSED 127.0.0.1:7890
+    at ClientRequest.<anonymous> (C:\antigravity\soliloquios-landing-page\node_modules\.pnpm\pnpm@10.18.1\node_modules\pnpm\dist\pnpm.cjs:41723:18)
+    at ClientRequest.emit (node:events:509:20)
+    at emitErrorEvent (node:_http_client:109:11)
+    at _destroy (node:_http_client:993:9)
+    at onSocketNT (node:_http_client:1013:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+[frontend]  ECONNREFUSED  request to https://registry.npmjs.org/pnpm/-/pnpm-10.4.1.tgz failed, reason: connect ECONNREFUSED 127.0.0.1:7890
+
+FetchError: request to https://registry.npmjs.org/pnpm/-/pnpm-10.4.1.tgz failed, reason: connect ECONNREFUSED 127.0.0.1:7890
+    at ClientRequest.<anonymous> (C:\antigravity\soliloquios-landing-page\node_modules\.pnpm\pnpm@10.18.1\node_modules\pnpm\dist\pnpm.cjs:41723:18)
+    at ClientRequest.emit (node:events:509:20)
+    at emitErrorEvent (node:_http_client:109:11)
+    at _destroy (node:_http_client:993:9)
+    at onSocketNT (node:_http_client:1013:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+ ELIFECYCLE  Command failed with exit code 1.

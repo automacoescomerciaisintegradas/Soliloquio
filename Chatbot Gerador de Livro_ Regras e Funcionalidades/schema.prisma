@@ -1,0 +1,77 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  nome      String
+  senha     String
+  ativo     Boolean    @default(true)
+  criadoEm  DateTime   @default(now())
+  
+  // Relações
+  mensagensEnviadas   Mensagem[] @relation("Remetente")
+  mensagensRecebidas  Mensagem[] @relation("Destinatario")
+  conversas           Conversa[] @relation("Participantes")
+  documentos          Documento[]
+  
+  @@map("usuarios")
+}
+
+model Conversa {
+  id        String     @id @default(cuid())
+  nome      String?
+  criadaEm  DateTime   @default(now())
+  
+  // Relações
+  participantes Usuario[]
+  mensagens     Mensagem[]
+  documentos    Documento[]
+  
+  @@map("conversas")
+}
+
+model Mensagem {
+  id        String     @id @default(cuid())
+  conteudo  String
+  criadaEm  DateTime   @default(now())
+  
+  // Relações
+  remetenteId   String
+  remetente     Usuario    @relation("Remetente", fields: [remetenteId], references: [id], onDelete: Cascade)
+  
+  destinatarioId String
+  destinatario   Usuario    @relation("Destinatario", fields: [destinatarioId], references: [id], onDelete: Cascade)
+  
+  conversaId    String
+  conversa      Conversa   @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+  
+  @@map("mensagens")
+}
+
+model Documento {
+  id        String     @id @default(cuid())
+  nome      String
+  email     String
+  telefone  String
+  arquivo   String     // URL ou caminho do arquivo PDF
+  criadoEm  DateTime   @default(now())
+  
+  // Relações
+  usuarioId String
+  usuario   Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  
+  conversaId String
+  conversa   Conversa   @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+  
+  @@map("documentos")
+}
